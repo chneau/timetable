@@ -1,0 +1,13 @@
+language: go
+go:
+  - 1.x
+
+git:
+  depth: 1
+
+branches:
+  only:
+  - master
+
+script:
+  - make test
