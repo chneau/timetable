@@ -23,6 +23,10 @@ type Whener interface {
 	When(time.Time, time.Duration) *time.Time
 }
 
+type noopwhener struct{}
+
+func (noopwhener) When(t time.Time, _ time.Duration) *time.Time { return &t }
+
 // TimeTable ...
 type TimeTable struct {
 	rel        []point
@@ -69,7 +73,15 @@ func sortPoints(x []point) {
 	})
 }
 
-// Add ...
+func (tt *TimeTable) check(from time.Time, dur time.Duration, cap float64) ([]point, bool) {
+	a := point{Time: from, val: cap}
+	b := point{Time: from.Add(dur), val: -cap}
+	x := append(append(tt.rel[:0:0], tt.rel...), a, b)
+	sortPoints(x)
+	return x, check(x, tt.max)
+}
+
+// Add will add the time else returns an error
 func (tt *TimeTable) Add(from time.Time, dur time.Duration, cap float64) error {
 	if cap < 0 {
 		return ErrInput
@@ -77,43 +89,44 @@ func (tt *TimeTable) Add(from time.Time, dur time.Duration, cap float64) error {
 	if cap > tt.max {
 		return ErrInput
 	}
-	if tt.constraint != nil {
-		if d := tt.constraint.When(from, dur); d != nil {
-			if !from.Equal(*d) {
-				return ErrConstraint
-			}
-		} else {
+	if d := tt.constraint.When(from, dur); d != nil {
+		if !from.Equal(*d) {
 			return ErrConstraint
 		}
+	} else {
+		return ErrConstraint
 	}
-	a := point{Time: from, val: cap}
-	b := point{Time: from.Add(dur), val: -cap}
-	x := append(append(tt.rel[:0:0], tt.rel...), a, b)
-	sortPoints(x)
-	if !check(x, tt.max) {
+	x, ok := tt.check(from, dur, cap)
+	if !ok {
 		return ErrOverflow
 	}
 	tt.rel = simplify(x)
 	return nil
 }
 
-// When ...
-func (tt *TimeTable) When(t time.Time, d time.Duration, cap float64) *time.Time {
-	score := 0.
-	if tt.constraint != nil {
-		if newT := tt.constraint.When(t, d); newT != nil {
-			if !newT.Equal(t) {
-				t = *newT
-			}
-		}
+// When returns the soonest time from "from" that satisfies constraints
+// else it will return a nil pointer
+func (tt *TimeTable) When(from time.Time, dur time.Duration, cap float64) *time.Time {
+	// check once
+	if t := tt.constraint.When(from, dur); t != nil {
+		from = *t
+	}
+	_, ok := tt.check(from, dur, cap)
+	if ok {
+		return &from
 	}
 	for i := range tt.rel {
-		score += tt.rel[i].val
-		if tt.rel[i].Before(t) {
+		if tt.rel[i].After(from) {
+			from = tt.rel[i].Time
+		} else {
 			continue
 		}
-		if i+1 < len(tt.rel) {
-
+		if t := tt.constraint.When(from, dur); t != nil {
+			from = *t
+		}
+		_, ok := tt.check(from, dur, cap)
+		if ok {
+			return &from
 		}
 	}
 	return nil
@@ -121,6 +134,9 @@ func (tt *TimeTable) When(t time.Time, d time.Duration, cap float64) *time.Time 
 
 // New ...
 func New(max float64, nd Whener) *TimeTable {
+	if nd == nil {
+		nd = noopwhener{}
+	}
 	t := &TimeTable{
 		max:        max,
 		constraint: nd,

@@ -60,5 +60,20 @@ func TestTimeTable_Add(t *testing.T) {
 }
 
 func TestTimeTable_When(t *testing.T) {
-	t.Error("Must continue implementation")
+	t.Run("micro overflow", func(t *testing.T) {
+		l := time.Now().Location()
+		oh := openhours.New("mo-fr 11:00-16:00", l) // this is the slow part of the code there this one
+		tt := New(10, oh)
+		d := time.Date(2019, 3, 12, 10, 0, 0, 0, l)
+		for i := 0; i < 1000; i++ {
+			when := tt.When(d, time.Hour, 1)
+			if when.After(d) { // when must never be null
+				d = *when // makes test faster and more realistic ?
+			}
+			err := tt.Add(*when, time.Hour, 1)
+			if err != nil {
+				t.Error("this should not be failing")
+			}
+		}
+	})
 }
