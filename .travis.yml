@@ -10,4 +10,5 @@ branches:
   - master
 
 script:
+  - go get -t -v .
   - make test
