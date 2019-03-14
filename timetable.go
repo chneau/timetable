@@ -13,9 +13,10 @@ var (
 	ErrOverflow   = errors.New("overflow")
 )
 
-type point struct {
-	time.Time
-	val float64
+// Point represent a moment in time
+type Point struct {
+	Time time.Time
+	Val  float64
 }
 
 // Whener ...
@@ -23,21 +24,23 @@ type Whener interface {
 	When(time.Time, time.Duration) *time.Time
 }
 
-type noopwhener struct{}
+// NoopWhen ...
+type NoopWhen struct{}
 
-func (noopwhener) When(t time.Time, _ time.Duration) *time.Time { return &t }
+// When ...
+func (NoopWhen) When(t time.Time, _ time.Duration) *time.Time { return &t }
 
 // TimeTable ...
 type TimeTable struct {
-	rel        []point
-	constraint Whener
-	max        float64
+	Rel        []Point
+	Constraint Whener
+	Max        float64
 }
 
-func check(rel []point, max float64) bool {
+func check(rel []Point, max float64) bool {
 	res := 0.
 	for _, v := range rel {
-		res += v.val
+		res += v.Val
 		if res > max {
 			return false
 		}
@@ -45,16 +48,16 @@ func check(rel []point, max float64) bool {
 	return true
 }
 
-func simplify(rel []point) []point {
-	new := []point{}
+func simplify(rel []Point) []Point {
+	new := []Point{}
 	for i := range rel {
 		if len(new) == 0 {
 			new = append(new, rel[i])
 			continue
 		}
 		if rel[i].Time.Equal(new[len(new)-1].Time) {
-			new[len(new)-1].val += rel[i].val
-			if new[len(new)-1].val == 0 {
+			new[len(new)-1].Val += rel[i].Val
+			if new[len(new)-1].Val == 0 {
 				new = new[: len(new)-1 : len(new)-1]
 			}
 		} else {
@@ -64,21 +67,21 @@ func simplify(rel []point) []point {
 	return new
 }
 
-func sortPoints(x []point) {
+func sortPoints(x []Point) {
 	sort.Slice(x, func(i, j int) bool {
-		if x[i].Equal(x[j].Time) {
-			return x[i].val < x[j].val
+		if x[i].Time.Equal(x[j].Time) {
+			return x[i].Val < x[j].Val
 		}
-		return x[i].Before(x[j].Time)
+		return x[i].Time.Before(x[j].Time)
 	})
 }
 
-func (tt *TimeTable) check(from time.Time, dur time.Duration, cap float64) ([]point, bool) {
-	a := point{Time: from, val: cap}
-	b := point{Time: from.Add(dur), val: -cap}
-	x := append(append(tt.rel[:0:0], tt.rel...), a, b)
+func (tt *TimeTable) check(from time.Time, dur time.Duration, cap float64) ([]Point, bool) {
+	a := Point{Time: from, Val: cap}
+	b := Point{Time: from.Add(dur), Val: -cap}
+	x := append(append(tt.Rel[:0:0], tt.Rel...), a, b)
 	sortPoints(x)
-	return x, check(x, tt.max)
+	return x, check(x, tt.Max)
 }
 
 // Add will add the time else returns an error
@@ -86,10 +89,10 @@ func (tt *TimeTable) Add(from time.Time, dur time.Duration, cap float64) error {
 	if cap < 0 {
 		return ErrInput
 	}
-	if cap > tt.max {
+	if cap > tt.Max {
 		return ErrInput
 	}
-	if d := tt.constraint.When(from, dur); d != nil {
+	if d := tt.Constraint.When(from, dur); d != nil {
 		if !from.Equal(*d) {
 			return ErrConstraint
 		}
@@ -100,28 +103,41 @@ func (tt *TimeTable) Add(from time.Time, dur time.Duration, cap float64) error {
 	if !ok {
 		return ErrOverflow
 	}
-	tt.rel = simplify(x)
+	tt.Rel = simplify(x)
+	return nil
+}
+
+// Clone ...
+func (tt TimeTable) Clone() TimeTable { return tt }
+
+// Merge ...
+func (tt TimeTable) Merge(other TimeTable) *TimeTable {
+	tt.Rel = append(tt.Rel, other.Rel...)
+	tt.Rel = simplify(tt.Rel)
+	if check(tt.Rel, tt.Max) {
+		return &tt
+	}
 	return nil
 }
 
 // When returns the soonest time from "from" that satisfies constraints
-// else it will return a nil pointer
+// else it will return a nil Pointer
 func (tt *TimeTable) When(from time.Time, dur time.Duration, cap float64) *time.Time {
 	// check once
-	if t := tt.constraint.When(from, dur); t != nil {
+	if t := tt.Constraint.When(from, dur); t != nil {
 		from = *t
 	}
 	_, ok := tt.check(from, dur, cap)
 	if ok {
 		return &from
 	}
-	for i := range tt.rel {
-		if tt.rel[i].After(from) {
-			from = tt.rel[i].Time
+	for i := range tt.Rel {
+		if tt.Rel[i].Time.After(from) {
+			from = tt.Rel[i].Time
 		} else {
 			continue
 		}
-		if t := tt.constraint.When(from, dur); t != nil {
+		if t := tt.Constraint.When(from, dur); t != nil {
 			from = *t
 		}
 		_, ok := tt.check(from, dur, cap)
@@ -135,11 +151,11 @@ func (tt *TimeTable) When(from time.Time, dur time.Duration, cap float64) *time.
 // New ...
 func New(max float64, nd Whener) *TimeTable {
 	if nd == nil {
-		nd = noopwhener{}
+		nd = NoopWhen{}
 	}
 	t := &TimeTable{
-		max:        max,
-		constraint: nd,
+		Max:        max,
+		Constraint: nd,
 	}
 	return t
 }
