@@ -119,6 +119,7 @@ func (tt TimeTable[T]) Clone() TimeTable[T] { return tt }
 // Merge ...
 func (tt TimeTable[T]) Merge(other TimeTable[T]) *TimeTable[T] {
 	tt.Rel = append(tt.Rel, other.Rel...)
+	sortPoints(tt.Rel)
 	tt.Rel = simplify(tt.Rel)
 	if check(tt.Rel, tt.Max) {
 		return &tt

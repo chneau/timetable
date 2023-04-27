@@ -77,3 +77,40 @@ func TestTimeTable_When(t *testing.T) {
 		}
 	})
 }
+
+func TestTimeTable_Merge(t *testing.T) {
+	t.Run("merge success", func(t *testing.T) {
+		l := time.Local
+		oh := openhours.New("mo-fr 11:00-16:00", l)
+		tt := New(10, oh)
+		d := time.Date(2019, 3, 12, 10, 0, 0, 0, l)
+		when := tt.When(d, time.Hour, 4)
+		err := tt.Add(*when, time.Hour, 4)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		tt2 := tt.Clone()
+		tt3 := tt.Merge(tt2)
+		if tt3 == nil {
+			t.Error("merge failed")
+		}
+	})
+	t.Run("merge fail", func(t *testing.T) {
+		l := time.Local
+		oh := openhours.New("mo-fr 11:00-16:00", l)
+		tt := New(10, oh)
+		d := time.Date(2019, 3, 12, 10, 0, 0, 0, l)
+		when := tt.When(d, time.Hour, 6)
+		err := tt.Add(*when, time.Hour, 6)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		tt2 := tt.Clone()
+		tt3 := tt.Merge(tt2)
+		if tt3 != nil {
+			t.Error("merge should have failed")
+		}
+	})
+}
