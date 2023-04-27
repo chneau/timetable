@@ -9,7 +9,7 @@ import (
 
 func TestTimeTable_Add(t *testing.T) {
 	t.Run("overlapping and simplifying", func(t *testing.T) {
-		l := time.Now().Location()
+		l := time.Local
 		oh := openhours.New("mo-fr 11:00-16:00", l)
 		tt := New(5, oh)
 		for i := 0; i < 5; i++ {
@@ -28,7 +28,7 @@ func TestTimeTable_Add(t *testing.T) {
 		}
 	})
 	t.Run("ranges overlap at same time", func(t *testing.T) {
-		l := time.Now().Location()
+		l := time.Local
 		oh := openhours.New("mo-fr 11:00-16:00", l)
 		tt := New(2, oh)
 		err := tt.Add(time.Date(2019, 3, 12, 11, 0, 0, 0, l), time.Hour, 1)
@@ -45,7 +45,7 @@ func TestTimeTable_Add(t *testing.T) {
 		}
 	})
 	t.Run("micro overflow", func(t *testing.T) {
-		l := time.Now().Location()
+		l := time.Local
 		oh := openhours.New("mo-fr 11:00-16:00", l)
 		tt := New(1., oh)
 		err := tt.Add(time.Date(2019, 3, 12, 11, 0, 0, 0, l), time.Hour*5, 1)
@@ -61,7 +61,7 @@ func TestTimeTable_Add(t *testing.T) {
 
 func TestTimeTable_When(t *testing.T) {
 	t.Run("micro overflow", func(t *testing.T) {
-		l := time.Now().Location()
+		l := time.Local
 		oh := openhours.New("mo-fr 11:00-16:00", l) // this is the slow part of the code there this one
 		tt := New(10, oh)
 		d := time.Date(2019, 3, 12, 10, 0, 0, 0, l)
@@ -77,7 +77,7 @@ func TestTimeTable_When(t *testing.T) {
 		}
 	})
 	t.Run("should be nil", func(t *testing.T) {
-		l := time.Now().Location()
+		l := time.Local
 		oh := openhours.New("mo-fr 11:00-16:00", l)
 		tt := New(10, oh)
 		d := time.Date(2019, 3, 12, 10, 0, 0, 0, l)
