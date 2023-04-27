@@ -76,6 +76,16 @@ func TestTimeTable_When(t *testing.T) {
 			}
 		}
 	})
+	t.Run("should be nil", func(t *testing.T) {
+		l := time.Now().Location()
+		oh := openhours.New("mo-fr 11:00-16:00", l)
+		tt := New(10, oh)
+		d := time.Date(2019, 3, 12, 10, 0, 0, 0, l)
+		when := tt.When(d, time.Hour, 12)
+		if when != nil {
+			t.Error("when should be nil")
+		}
+	})
 }
 
 func TestTimeTable_Merge(t *testing.T) {
