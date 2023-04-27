@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sort"
 	"time"
+
+	"golang.org/x/exp/constraints"
 )
 
 // Errors ...
@@ -13,10 +15,14 @@ var (
 	ErrOverflow   = errors.New("overflow")
 )
 
+type Number interface {
+	constraints.Float | constraints.Integer
+}
+
 // Point represent a moment in time
-type Point struct {
+type Point[T Number] struct {
 	Time time.Time
-	Val  float64
+	Val  T
 }
 
 // Whener ...
@@ -31,14 +37,14 @@ type NoopWhen struct{}
 func (NoopWhen) When(t time.Time, _ time.Duration) *time.Time { return &t }
 
 // TimeTable ...
-type TimeTable struct {
-	Rel        []Point
+type TimeTable[T Number] struct {
+	Rel        []Point[T]
 	Constraint Whener
-	Max        float64
+	Max        T
 }
 
-func check(rel []Point, max float64) bool {
-	res := 0.
+func check[T Number](rel []Point[T], max T) bool {
+	var res T
 	for _, v := range rel {
 		res += v.Val
 		if res > max {
@@ -48,8 +54,8 @@ func check(rel []Point, max float64) bool {
 	return true
 }
 
-func simplify(rel []Point) []Point {
-	new := []Point{}
+func simplify[T Number](rel []Point[T]) []Point[T] {
+	new := []Point[T]{}
 	for i := range rel {
 		if len(new) == 0 {
 			new = append(new, rel[i])
@@ -67,7 +73,7 @@ func simplify(rel []Point) []Point {
 	return new
 }
 
-func sortPoints(x []Point) {
+func sortPoints[T Number](x []Point[T]) {
 	sort.Slice(x, func(i, j int) bool {
 		if x[i].Time.Equal(x[j].Time) {
 			return x[i].Val < x[j].Val
@@ -76,16 +82,16 @@ func sortPoints(x []Point) {
 	})
 }
 
-func (tt *TimeTable) check(from time.Time, dur time.Duration, cap float64) ([]Point, bool) {
-	a := Point{Time: from, Val: cap}
-	b := Point{Time: from.Add(dur), Val: -cap}
+func (tt *TimeTable[T]) check(from time.Time, dur time.Duration, cap T) ([]Point[T], bool) {
+	a := Point[T]{Time: from, Val: cap}
+	b := Point[T]{Time: from.Add(dur), Val: -cap}
 	x := append(append(tt.Rel[:0:0], tt.Rel...), a, b)
 	sortPoints(x)
 	return x, check(x, tt.Max)
 }
 
 // Add will add the time else returns an error
-func (tt *TimeTable) Add(from time.Time, dur time.Duration, cap float64) error {
+func (tt *TimeTable[T]) Add(from time.Time, dur time.Duration, cap T) error {
 	if cap < 0 {
 		return ErrInput
 	}
@@ -108,10 +114,10 @@ func (tt *TimeTable) Add(from time.Time, dur time.Duration, cap float64) error {
 }
 
 // Clone ...
-func (tt TimeTable) Clone() TimeTable { return tt }
+func (tt TimeTable[T]) Clone() TimeTable[T] { return tt }
 
 // Merge ...
-func (tt TimeTable) Merge(other TimeTable) *TimeTable {
+func (tt TimeTable[T]) Merge(other TimeTable[T]) *TimeTable[T] {
 	tt.Rel = append(tt.Rel, other.Rel...)
 	tt.Rel = simplify(tt.Rel)
 	if check(tt.Rel, tt.Max) {
@@ -122,7 +128,7 @@ func (tt TimeTable) Merge(other TimeTable) *TimeTable {
 
 // When returns the soonest time from "from" that satisfies constraints
 // else it will return a nil Pointer
-func (tt *TimeTable) When(from time.Time, dur time.Duration, cap float64) *time.Time {
+func (tt *TimeTable[T]) When(from time.Time, dur time.Duration, cap T) *time.Time {
 	// check once
 	if t := tt.Constraint.When(from, dur); t != nil {
 		from = *t
@@ -149,11 +155,11 @@ func (tt *TimeTable) When(from time.Time, dur time.Duration, cap float64) *time.
 }
 
 // New ...
-func New(max float64, nd Whener) *TimeTable {
+func New[T Number](max T, nd Whener) *TimeTable[T] {
 	if nd == nil {
 		nd = NoopWhen{}
 	}
-	t := &TimeTable{
+	t := &TimeTable[T]{
 		Max:        max,
 		Constraint: nd,
 	}

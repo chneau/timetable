@@ -47,7 +47,7 @@ func TestTimeTable_Add(t *testing.T) {
 	t.Run("micro overflow", func(t *testing.T) {
 		l := time.Now().Location()
 		oh := openhours.New("mo-fr 11:00-16:00", l)
-		tt := New(1, oh)
+		tt := New(1., oh)
 		err := tt.Add(time.Date(2019, 3, 12, 11, 0, 0, 0, l), time.Hour*5, 1)
 		if err != nil {
 			t.Error(err)
