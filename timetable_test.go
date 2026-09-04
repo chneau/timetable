@@ -124,3 +124,80 @@ func TestTimeTable_Merge(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkTimeTable(b *testing.B) {
+	oh := openhours.New("Mo-Fr 08:00-18:00", time.UTC)
+	baseTime := time.Date(2026, 8, 24, 9, 0, 0, 0, time.UTC)
+	oneHour := time.Hour
+
+	b.Run("Sequential Add", func(b *testing.B) {
+		tt := New(100.0, oh)
+		for i := 0; i < b.N; i++ {
+			_ = tt.Add(baseTime.Add(time.Duration(i%500)*10*time.Minute), oneHour, 1.0)
+			if len(tt.Rel) > 200 {
+				tt = New(100.0, oh)
+			}
+		}
+	})
+
+	b.Run("Capacity Search When", func(b *testing.B) {
+		tt := New(3.0, oh)
+		for i := 0; i < 5; i++ {
+			_ = tt.Add(baseTime.Add(time.Duration(i*2)*time.Hour), 2*time.Hour, 2.0)
+		}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			tt.When(baseTime.Add(time.Duration(i%40)*time.Hour), oneHour, 2.0)
+		}
+	})
+}
+
+func TestRunStandardBenchmarkSuite(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+	oh := openhours.New("Mo-Fr 08:00-18:00", time.UTC)
+	baseTime := time.Date(2026, 8, 24, 9, 0, 0, 0, time.UTC)
+	oneHour := time.Hour
+
+	println("========================================================")
+	println("Running TimeTable Benchmarks (Go Suite)")
+	println("========================================================")
+
+	// Warmup
+	warmupTT := New(5.0, oh)
+	for i := 0; i < 5000; i++ {
+		_ = warmupTT.Add(baseTime.Add(time.Duration(i%24)*time.Hour), oneHour, 1.0)
+		warmupTT.When(baseTime.Add(time.Duration(i%10)*time.Hour), oneHour, 1.0)
+		if len(warmupTT.Rel) > 50 {
+			warmupTT = New(5.0, oh)
+		}
+	}
+
+	// 1. Sequential Add
+	addOps := 50000
+	tt := New(100.0, oh)
+	t0 := time.Now()
+	for i := 0; i < addOps; i++ {
+		_ = tt.Add(baseTime.Add(time.Duration(i*10)*time.Minute), oneHour, 1.0)
+		if len(tt.Rel) > 200 {
+			tt = New(100.0, oh)
+		}
+	}
+	d1 := time.Since(t0)
+	println("1. Sequential Add (50000 calls):              ", d1.Milliseconds(), "ms", "(", float64(d1.Microseconds())/float64(addOps), "us/op )")
+
+	// 2. Capacity Search When
+	whenOps := 20000
+	searchTT := New(3.0, oh)
+	for i := 0; i < 5; i++ {
+		_ = searchTT.Add(baseTime.Add(time.Duration(i*2)*time.Hour), 2*time.Hour, 2.0)
+	}
+	t0 = time.Now()
+	for i := 0; i < whenOps; i++ {
+		searchTT.When(baseTime.Add(time.Duration(i%40)*time.Hour), oneHour, 2.0)
+	}
+	d2 := time.Since(t0)
+	println("2. Capacity Search When (20000 calls):         ", d2.Milliseconds(), "ms", "(", float64(d2.Microseconds())/float64(whenOps), "us/op )")
+	println("========================================================")
+}
